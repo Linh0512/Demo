@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Tuyển sinh UIT</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        #chatbox {
+            width: 80%;
+            max-width: 800px;
+            height: 400px;
+            overflow-y: scroll;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            max-width: 75%;
+            display: flex;
+        }
+
+        .user_message {
+            background-color: #e1ffc7;
+            margin-left: auto;
+            text-align: right;
+            flex-direction: row-reverse;
+        }
+
+        .bot_message {
+            background-color: #d1d1d1;
+            text-align: left;
+        }
+
+        .avatar {
+            margin: 5px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        .chat-form {
+            display: flex;
+            justify-content: center;
+            width: 80%;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        textarea {
+            flex-grow: 1;
+            height: 80px; /* Giảm chiều cao của textarea */
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            resize: none;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+
+        #toggle-list {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        #question-list {
+            display: none;
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            width: 300px;
+            max-height: 300px; /* Kích thước tối đa của danh sách câu hỏi */
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            padding: 10px;
+            overflow-y: auto; /* Cho phép cuộn khi nội dung vượt quá kích thước */
+        }
+
+
+        #question-list input {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        #question-list ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #question-list ul li {
+            padding: 5px;
+            cursor: pointer;
+        }
+
+        #question-list ul li:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chatbot Tuyển sinh UIT</h1>
+
+    <!-- Khu vực hiển thị tin nhắn -->
+    <div id="chatbox">
+        {% for message in messages %}
+        <div class="message {{ message.type }}">
+            {{ message.text }}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Form gửi câu hỏi -->
+    <form method="POST" action="/get_answer" id="chat-form" class="chat-form">
+        <textarea name="question" id="question" placeholder="Nhập câu hỏi của bạn"></textarea>
+        <button type="submit">Gửi</button>
+    </form>
+
+    <!-- Nút để hiển thị danh sách câu hỏi -->
+    <button id="toggle-list">Danh sách câu hỏi</button>
+
+    <!-- Danh sách câu hỏi -->
+    <div id="question-list">
+        <input type="text" id="search-box" placeholder="Tìm kiếm câu hỏi...">
+        <ul id="questions">
+            <!-- Các câu hỏi sẽ được thêm vào đây bằng JavaScript -->
+        </ul>
+    </div>
+
+    <script>
+        // Các câu hỏi từ database
+        const questions = [
+        'Điểm đầu vào của môn Khoa học máy tính là bao nhiêu?',
+        'Điểm đầu vào của ngành Mạng máy tính là bao nhiêu?',
+        'Điểm đầu vào của ngành Hệ thống thông tin là bao nhiêu?',
+        'Điểm đầu vào của ngành Khoa học dữ liệu là bao nhiêu?',
+        'Điểm đầu vào của ngành Đồ họa máy tính là bao nhiêu?',
+        'Điểm đầu vào của ngành An toàn thông tin là bao nhiêu?',
+        'Điểm đầu vào của ngành Trí tuệ nhân tạo là bao nhiêu?',
+        'Điểm đầu vào của ngành Kỹ thuật máy tính là bao nhiêu?',
+        'Điểm đầu vào của ngành Công nghệ phần mềm là bao nhiêu?',
+        'Điểm đầu vào của ngành Công nghệ thông tin là bao nhiêu?',
+        'Điểm đầu vào của ngành Thiết kế đồ họa là bao nhiêu?',
+        'Điểm đầu vào của ngành Phát triển ứng dụng di động là bao nhiêu?',
+        'Điểm đầu vào của ngành Quản trị mạng là bao nhiêu?',
+        'Điểm đầu vào của ngành Khoa học máy tính quốc tế là bao nhiêu?',
+        'Điểm đầu vào của ngành Kỹ thuật phần mềm quốc tế là bao nhiêu?',
+        'Điểm đầu vào của ngành Giảng dạy tiếng Anh chuyên ngành CNTT là bao nhiêu?',
+        'Điểm đầu vào của ngành Công nghệ game là bao nhiêu?',
+        'Điểm đầu vào của ngành Phân tích dữ liệu là bao nhiêu?',
+        'Điểm đầu vào của ngành Kỹ thuật hệ thống là bao nhiêu?',
+        'Điểm đầu vào của ngành Công nghệ thông tin ứng dụng là bao nhiêu?',
+        'Điểm đầu vào của ngành Internet vạn vật là bao nhiêu?',
+        'Học phí chương trình đại học là bao nhiêu?', 
+        'Thời gian xét tuyển là từ tháng mấy?', 
+        'Có cần thi môn Toán khi đăng ký vào ngành CNTT không?', 
+        'Thời gian nhập học là khi nào?', 
+        'Trường có chế độ học bổng không?', 
+        'Nhà ở sinh viên có hay không?', 
+        'Chương trình học tiếng Anh tại UIT có hay không?', 
+        'Có cơ hội thực tập trong quá trình học không?', 
+        'Điểm xét tuyển của ngành Công nghệ thông tin có biến động không?', 
+        'Khoa có tổ chức các buổi hội thảo không?', 
+        'Có thể chuyển đổi ngành học sau năm nhất không?', 
+        'Có cần học bổ sung môn nào trước khi vào đại học không?', 
+        'Trường có các hoạt động ngoại khóa nào không?', 
+        'Ngành nào có triển vọng việc làm cao nhất?', 
+        'Có chương trình đào tạo online không?', 
+        'Đầu vào ngành Mạng máy tính là bao nhiêu?', 
+        'Có thể đăng ký nhiều ngành cùng lúc không?', 
+        'Trường có tổ chức các cuộc thi hackathon không?', 
+        'Có cơ hội tham gia nghiên cứu khoa học không?', 
+        'Trường có ký túc xá dành cho sinh viên quốc tế không?', 
+        'Chương trình học có được linh hoạt không?', 
+        'Thời gian để hoàn thành chương trình học là bao lâu?', 
+        'Ngành nào yêu cầu thi tiếng Anh?', 
+        'Có thể học bằng thứ hai tại UIT không?', 
+        'Khi nào sẽ có kết quả xét tuyển?', 
+        'Trường có hỗ trợ việc làm sau khi tốt nghiệp không?', 
+        'Có thể liên hệ với nhà trường qua kênh nào?', 
+        'Chương trình học có khác gì so với các trường khác không?', 
+        'Trường có có chế độ giữ xe cho sinh viên không?', 
+        'Điểm chuẩn có thay đổi tùy năm không?', 
+        'Có thể xin gia hạn thời gian học không?', 
+        'Chương trình học có được mở lớp theo yêu cầu không?', 
+        'Có hỗ trợ cho sinh viên trong việc thực tập không?', 
+        'Có thể học các môn tự chọn không?', 
+        'Ai là người phụ trách tư vấn tuyển sinh?', 
+        'Trường có tổ chức chương trình giới thiệu nghề nghiệp không?', 
+        'Có điều kiện gì khi học tại UIT không?', 
+        'Khi nào thì mở cổng đăng ký trực tuyến?', 
+        'Có thể đăng ký học phần trực tuyến không?', 
+        'Có thể chuyển tiếp từ đại học khác sang UIT không?', 
+        'Chương trình đào tạo có đạt chuẩn không?', 
+        'Có thể học song song hai ngành không?', 
+        'Trường có hỗ trợ tư vấn tâm lý cho sinh viên không?', 
+        'Có dịch vụ cho vay tài chính không?', 
+        'Có y tế cho sinh viên trong trường không?', 
+        'Có các bộ môn chuyên ngành nào tại UIT không?', 
+        'Trường có giảng viên từ nước ngoài không?', 
+        'Có phải tham gia học quân sự không?', 
+        'Thời gian học thực tập là bao lâu?', 
+        'Có những hoạt động gì trong tuần sinh viên không?', 
+        'Khi nào thì kết thúc thời gian đăng ký nhập học?', 
+        'Có thể xin học bổng vào giữa năm học không?', 
+        'Nhà trường có cung cấp dịch vụ hỗ trợ học tập không?', 
+        'Ngành nào có chương trình thực tập trong quá trình học?', 
+        'Trường có tổ chức các cuộc thi học thuật không?', 
+        'Có yêu cầu bắt buộc phải tham gia vào các hoạt động ngoại khóa không?', 
+        'Có thể thay đổi chuyên ngành sau khi nhập học không?', 
+        'Có hỗ trợ học phí cho sinh viên có hoàn cảnh khó khăn không?', 
+        'Khi nào thì công bố kết quả thi?', 
+        'Có thể tham gia các lớp học bổ sung vào kỳ nghỉ hè không?', 
+        'Có chương trình trao đổi sinh viên quốc tế không?', 
+        'Nhà trường có dịch vụ hỗ trợ việc làm cho sinh viên không?', 
+        'Có thể học thêm các khóa học trực tuyến không?', 
+        'Có yêu cầu về chứng chỉ ngoại ngữ khi vào học không?', 
+        'Chương trình học có bao gồm thực tập tại doanh nghiệp không?', 
+        'Có thể đăng ký học phần cho sinh viên năm nhất không?', 
+        'Có yêu cầu về độ tuổi tối thiểu khi nhập học không?', 
+        'Có hỗ trợ tài chính cho sinh viên quốc tế không?', 
+        'Nhà trường có tổ chức các khóa học về kỹ năng mềm không?', 
+        'Có thể chuyển tiếp sang chương trình học khác tại trường không?', 
+        'Có thể xin nghỉ học dài hạn không?', 
+        'Có chương trình học hè cho sinh viên không?', 
+        'Có thể nộp hồ sơ xét tuyển trực tuyến không?', 
+        'Chương trình đào tạo có yêu cầu thi đầu vào không?', 
+        'Có chương trình đào tạo cho sinh viên vừa học vừa làm không?', 
+        'Có thể hoãn việc nhập học không?', 
+        'Khi nào thì bắt đầu nhận hồ sơ xét tuyển cho năm học tới?', 
+        'Có yêu cầu về điểm trung bình trong năm học phổ thông không?', 
+        'Có thể tham gia khóa học dự bị trước khi vào đại học không?', 
+        'Có chương trình trao đổi sinh viên với các quốc gia khác không?', 
+        'Có yêu cầu về chứng chỉ ngoại ngữ khi vào học không?', 
+        'Nhà trường có tổ chức các buổi hướng dẫn trước khi nhập học không?', 
+        'Có thể nộp hồ sơ xét tuyển qua đường bưu điện không?', 
+        'Có yêu cầu về hồ sơ tài chính không?', 
+        'Có hỗ trợ cho sinh viên không đủ điều kiện tài chính không?', 
+        'Có thể đổi ngành học sau khi nhập học không?', 
+        'Có thể đăng ký học cùng lúc nhiều khóa học không?', 
+        'Có cần phải nộp bảng điểm học bạ không?', 
+        'Nhà trường có tổ chức các khóa học bổ trợ kỹ năng mềm không?', 
+        'Có thể thay đổi phương thức học từ học toàn thời gian sang học bán thời gian không?', 
+        'Có yêu cầu về điểm thi tốt nghiệp THPT không?', 
+        'Nhà trường có tổ chức các hoạt động giao lưu văn hóa không?', 
+        'Có thể đăng ký học thêm các môn học ngoại khóa không?', 
+        'Có yêu cầu về sự tham gia trong các hoạt động cộng đồng không?', 
+        'Nhà trường có chương trình học bổng cho sinh viên giỏi không?', 
+        'Có thể xin học bổng toàn phần không?', 
+        'Có cần phải tham gia phỏng vấn trước khi nhập học không?', 
+        'Có hỗ trợ cho sinh viên trong việc tìm việc làm không?', 
+        'Có thể tham gia các hoạt động nghiên cứu khoa học từ năm nhất không?', 
+        'Có thể đăng ký vào ngành học khác sau khi đã được nhận không?', 
+        'Nhà trường có tổ chức các khóa học về quản lý thời gian không?', 
+        'Có thể đổi giờ học không?', 
+        'Có cần phải nộp đơn xin học bổng riêng biệt không?', 
+        'Nhà trường có tổ chức các chuyến tham quan doanh nghiệp không?', 
+        'Có chương trình đào tạo dành cho sinh viên quốc tế không?', 
+        'Có yêu cầu về điểm chuẩn cho các ngành khác nhau không?', 
+        'Có thể tham gia các lớp học ngoại ngữ miễn phí không?', 
+        'Có thể sử dụng các thiết bị học tập cá nhân trong lớp không?', 
+        'Có thể đăng ký học thêm các khóa học online không?', 
+        'Có yêu cầu về hồ sơ sức khỏe không?', 
+        'Nhà trường có tổ chức các buổi hướng nghiệp cho sinh viên không?', 
+        'Có chương trình đào tạo đặc biệt cho sinh viên xuất sắc không?', 
+        'Có thể tham gia các hoạt động tình nguyện không?', 
+        'Có yêu cầu về kỹ năng máy tính khi vào học không?', 
+        'Nhà trường có hỗ trợ cho sinh viên khi đi thực tập không?', 
+        'Có thể học các môn học theo tốc độ riêng không?', 
+        'Có yêu cầu về bài luận khi xét tuyển không?', 
+        'Nhà trường có tổ chức các khóa học về kỹ năng lãnh đạo không?', 
+        'Có thể đăng ký vào các lớp học theo nhu cầu không?', 
+        'Có cần phải hoàn thành các môn học bổ sung không?', 
+        'Nhà trường có hỗ trợ tìm nhà ở cho sinh viên không?', 
+        'Có chương trình học bổng cho sinh viên quốc tế không?', 
+        'Có thể học thêm các môn học phụ trợ không?', 
+        'Nhà trường có tổ chức các buổi giao lưu với các doanh nghiệp không?', 
+        'Có yêu cầu về chứng chỉ kỹ năng tin học không?', 
+        'Nhà trường có tổ chức các lớp học miễn phí cho sinh viên không?', 
+        'Có thể nộp hồ sơ xét tuyển qua email không?', 
+        'Nhà trường có tổ chức các khóa học bổ sung cho sinh viên không?', 
+        'Có yêu cầu về điểm số môn học đặc biệt không?', 
+        'Có thể đổi nguyện vọng ngành học sau khi đã nộp hồ sơ không?', 
+        'Nhà trường có tổ chức các khóa học mùa hè không?', 
+        'Có chương trình đào tạo thạc sĩ không?', 
+        'Nhà trường có hỗ trợ cho sinh viên khởi nghiệp không?', 
+        'Có yêu cầu về mức điểm thi đầu vào không?', 
+        'Có chương trình học bổng cho sinh viên có thành tích cao không?', 
+        'Có thể đăng ký vào ngành học yêu thích không?', 
+        'Nhà trường có tổ chức các khóa học về kỹ năng mềm không?', 
+        'Có yêu cầu về điểm thi môn học cụ thể không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc chuẩn bị hồ sơ xin việc không?', 
+        'Có thể tham gia các lớp học thử nghiệm không?', 
+        'Nhà trường có tổ chức các khóa học về kỹ thuật số không?', 
+        'Có thể nhận học bổng ngay khi nhập học không?', 
+        'Nhà trường có chương trình học bổng cho sinh viên theo học ngành đặc thù không?', 
+        'Có yêu cầu về tham gia vào các hoạt động xã hội không?', 
+        'Có thể yêu cầu hỗ trợ học tập riêng không?', 
+        'Nhà trường có tổ chức các lớp học kỹ năng sống không?', 
+        'Có yêu cầu về tài liệu học tập không?', 
+        'Có thể đăng ký các môn học ngoài chương trình chính không?', 
+        'Nhà trường có tổ chức các buổi hội thảo về nghề nghiệp không?', 
+        'Có thể học các môn học từ xa không?', 
+        'Có chương trình học bổng cho sinh viên có kết quả học tập xuất sắc không?', 
+        'Nhà trường có tổ chức các buổi đào tạo kỹ năng mềm không?', 
+        'Có yêu cầu về điểm số trong các kỳ thi phụ không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc phát triển dự án cá nhân không?', 
+        'Có thể tham gia vào các hoạt động thể thao không?', 
+        'Có yêu cầu về độ tuổi tối thiểu hoặc tối đa khi nhập học không?', 
+        'Nhà trường có tổ chức các lớp học về khởi nghiệp không?', 
+        'Có thể chuyển đổi phương thức học từ toàn thời gian sang bán thời gian không?', 
+        'Có yêu cầu về kỹ năng lập trình khi vào học ngành CNTT không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc chuẩn bị cho kỳ thi quốc tế không?', 
+        'Có thể yêu cầu học bổng cho khóa học cụ thể không?', 
+        'Nhà trường có tổ chức các lớp học về kỹ năng giao tiếp không?', 
+        'Có thể thay đổi chương trình học không?', 
+        'Nhà trường có tổ chức các lớp học về quản lý dự án không?', 
+        'Có yêu cầu về hồ sơ cá nhân không?', 
+        'Có thể tham gia vào các câu lạc bộ sinh viên không?', 
+        'Nhà trường có chương trình học bổng cho sinh viên có thành tích thể thao không?', 
+        'Có thể học các môn học tự chọn trong kỳ nghỉ hè không?', 
+        'Nhà trường có tổ chức các lớp học về tài chính cá nhân không?', 
+        'Có yêu cầu về bằng cấp bổ sung không?', 
+        'Nhà trường có hỗ trợ cho sinh viên trong việc tham gia các cuộc thi quốc tế không?', 
+        'Có thể đổi thời gian học không?', 
+        'Nhà trường có tổ chức các buổi tư vấn học tập không?', 
+        'Có thể yêu cầu hỗ trợ cho dự án nghiên cứu không?', 
+        'Có yêu cầu về các chứng chỉ bổ sung không?', 
+        'Nhà trường có tổ chức các lớp học về công nghệ mới không?', 
+        'Có thể nhận học bổng cho các môn học cụ thể không?', 
+        'Nhà trường có tổ chức các lớp học về trí tuệ nhân tạo không?', 
+        'Có yêu cầu về mức điểm thi đầu vào không?', 
+        'Có thể tham gia các lớp học ngoài chương trình chính không?', 
+        'Nhà trường có tổ chức các buổi đào tạo về quản lý thời gian không?', 
+        'Có yêu cầu về kỹ năng ngoại ngữ không?', 
+        'Nhà trường có hỗ trợ cho sinh viên trong việc làm dự án cá nhân không?', 
+        'Có thể thay đổi ngành học sau khi nhập học không?', 
+        'Nhà trường có tổ chức các lớp học về kỹ thuật phần mềm không?', 
+        'Có yêu cầu về điểm số môn học phụ không?', 
+        'Nhà trường có tổ chức các lớp học về bảo mật thông tin không?', 
+        'Có thể đăng ký vào nhiều ngành cùng lúc không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc chuẩn bị cho kỳ thi tốt nghiệp không?', 
+        'Có yêu cầu về học lực trung bình không?', 
+        'Nhà trường có tổ chức các lớp học về phát triển ứng dụng di động không?', 
+        'Có thể thay đổi lịch học không?', 
+        'Nhà trường có tổ chức các lớp học về lập trình game không?', 
+        'Có yêu cầu về bằng cấp trước khi vào học không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc thực tập không?', 
+        'Có thể học một khóa học ngắn hạn không?', 
+        'Nhà trường có tổ chức các lớp học về marketing không?', 
+        'Có yêu cầu về kỹ năng mềm khi xét tuyển không?', 
+        'Nhà trường có tổ chức các lớp học về phân tích dữ liệu không?', 
+        'Có thể yêu cầu học bổng cho học kỳ cụ thể không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc chuẩn bị cho các kỳ thi quốc gia không?', 
+        'Có thể tham gia các khóa học kỹ thuật không?', 
+        'Nhà trường có tổ chức các lớp học về blockchain không?', 
+        'Có yêu cầu về điểm số trong các môn học cụ thể không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc làm nghiên cứu không?', 
+        'Có thể thay đổi phương thức học từ trực tuyến sang học trực tiếp không?', 
+        'Nhà trường có tổ chức các lớp học về kỹ thuật mạng không?', 
+        'Có yêu cầu về chứng chỉ học thuật bổ sung không?', 
+        'Nhà trường có tổ chức các lớp học về phát triển phần mềm không?', 
+        'Có thể tham gia vào các câu lạc bộ nghiên cứu không?', 
+        'Nhà trường có hỗ trợ cho sinh viên trong việc tham gia các hội thảo quốc tế không?', 
+        'Có yêu cầu về chứng chỉ kỹ thuật không?', 
+        'Nhà trường có tổ chức các lớp học về trí tuệ nhân tạo không?', 
+        'Có thể yêu cầu học bổng cho các môn học cụ thể không?', 
+        'Nhà trường có tổ chức các lớp học về quản trị mạng không?', 
+        'Có yêu cầu về điểm số trong các môn học cụ thể không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc chuẩn bị cho kỳ thi chứng chỉ quốc tế không?', 
+        'Có thể học các khóa học ngắn hạn ngoài chương trình chính không?', 
+        'Nhà trường có tổ chức các lớp học về công nghệ thông tin không?', 
+        'Có yêu cầu về điểm số trong các môn học cụ thể không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc làm việc tại các công ty đa quốc gia không?', 
+        'Có thể tham gia các khóa học về thiết kế đồ họa không?', 
+        'Nhà trường có tổ chức các lớp học về lập trình phần mềm không?', 
+        'Có yêu cầu về chứng chỉ học thuật không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc tham gia các chương trình trao đổi sinh viên quốc tế không?', 
+        'Có thể học các khóa học trực tuyến không?', 
+        'Nhà trường có tổ chức các lớp học về sáng tạo nội dung không?', 
+        'Có yêu cầu về điểm số trong các môn học đặc biệt không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc tham gia các hoạt động ngoại khóa không?', 
+        'Có thể đăng ký vào nhiều chương trình đào tạo cùng lúc không?', 
+        'Nhà trường có tổ chức các lớp học về kỹ thuật phần mềm không?', 
+        'Có yêu cầu về chứng chỉ công nghệ thông tin không?', 
+        'Nhà trường có hỗ trợ cho sinh viên trong việc tham gia các dự án nghiên cứu không?', 
+        'Có thể yêu cầu học bổng cho các khóa học ngắn hạn không?', 
+        'Nhà trường có tổ chức các lớp học về quản lý hệ thống không?', 
+        'Có yêu cầu về điểm số trong các môn học phụ không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc tham gia các cuộc thi quốc tế không?', 
+        'Có thể học các môn học tự chọn không?', 
+        'Nhà trường có tổ chức các lớp học về phát triển kỹ năng lãnh đạo không?', 
+        'Có yêu cầu về chứng chỉ kỹ thuật bổ sung không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc tìm kiếm việc làm không?', 
+        'Có thể tham gia các lớp học ngắn hạn về phát triển cá nhân không?', 
+        'Nhà trường có tổ chức các lớp học về phân tích dữ liệu không?', 
+        'Có yêu cầu về bằng cấp bổ sung không?', 
+        'Nhà trường có tổ chức các lớp học về kỹ thuật số không?', 
+        'Có thể đăng ký vào nhiều chương trình học cùng lúc không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc chuẩn bị cho kỳ thi chứng chỉ quốc tế không?', 
+        'Có thể học các khóa học ngắn hạn trong kỳ nghỉ hè không?', 
+        'Nhà trường có tổ chức các lớp học về lập trình mạng không?', 
+        'Có yêu cầu về chứng chỉ học thuật cụ thể không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc tham gia các chương trình trao đổi sinh viên không?', 
+        'Có thể tham gia các lớp học về phát triển ứng dụng di động không?', 
+        'Nhà trường có tổ chức các lớp học về phát triển phần mềm không?', 
+        'Có yêu cầu về chứng chỉ học thuật cụ thể không?', 
+        'Nhà trường có hỗ trợ sinh viên trong việc tham gia các chương trình trao đổi sinh viên quốc tế không?', 
+        'Có thể học các khóa học ngắn hạn về kỹ năng mềm không?', 
+        'Nhà trường có tổ chức các lớp học về lập trình phần mềm không?',
+    ];
+
+        // Hiển thị danh sách câu hỏi khi nhấn nút
+        document.getElementById('toggle-list').addEventListener('click', function() {
+            const list = document.getElementById('question-list');
+            list.style.display = list.style.display === 'none' || list.style.display === '' ? 'block' : 'none';
+        });
+
+        // Tạo danh sách câu hỏi
+        function populateQuestions() {
+            const ul = document.getElementById('questions');
+            ul.innerHTML = '';
+            questions.forEach(question => {
+                const li = document.createElement('li');
+                li.textContent = question;
+                li.addEventListener('click', function() {
+                    document.getElementById('question').value = question;
+                });
+                ul.appendChild(li);
+            });
+        }
+
+        populateQuestions();
+
+        // Tìm kiếm câu hỏi
+        document.getElementById('search-box').addEventListener('input', function(event) {
+            const query = event.target.value.toLowerCase();
+            const items = document.querySelectorAll('#questions li');
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('question').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                if (event.shiftKey) {
+                    return;
+                } else {
+                    event.preventDefault();
+                    document.getElementById('chat-form').submit();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
